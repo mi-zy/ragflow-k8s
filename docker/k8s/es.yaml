@@ -1,0 +1,91 @@
+# RagFlow使用Elasticsearch存储上传文档数据（是文件管理上传后链接到知识库；知识库上传使用MinIO）、向量数据、任务信息
+# Deployment的containerPort和Service的targetPort端口号保持一致(这里通过name引用)。流量通过 Service 的 targetPort 转发到对应的后端Pod的containerPort; port是Service暴露在ClusterIP 上的端口。
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragflow-es
+  namespace: ragflow
+  labels:
+    controller: ragflow-es-01-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: es
+  template:
+    metadata:
+      labels:
+        app: es
+    spec:
+      containers:
+      - name: es
+        image: core.harbor.domain/mizy/elasticsearch:8.11.3
+        imagePullPolicy: IfNotPresent
+        securityContext:   
+          privileged: true                   
+        resources:
+          requests:
+            cpu: "8000m" 
+            memory: "12Gi"
+          limits:
+            cpu: "16000m"
+            memory: "32Gi"    
+        env:
+        - name: node.name
+          value: "es01"
+        - name: ELASTIC_PASSWORD
+          value: "infini_rag_flow"  
+        - name: bootstrap.memory_lock
+          value: "false"
+        - name: discovery.type
+          value: "single-node"  
+        - name: xpack.security.enabled
+          value: "true"
+        - name: xpack.security.http.ssl.enabled       
+          value: "false"  
+        - name: xpack.security.transport.ssl.enabled 
+          value: "false"           
+        - name: TZ
+          value: "Asia/Shanghai"           
+        ports:
+        - name: es-port 
+          containerPort: 9200   
+        volumeMounts:
+        - name: ragflow-es
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+        - name: ragflow-es
+          persistentVolumeClaim:
+            claimName: "rook-ragflow-es"
+            
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+  # labels:
+    # app: es
+  # name: rook-ragflow-es
+  # namespace: ragflow  
+# spec:
+  # accessModes:
+  # - ReadWriteOnce
+  # resources:
+    # requests:
+      # storage: 100Gi
+  # storageClassName: rook-ceph-block
+  # volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: es01
+  namespace: ragflow  
+spec:
+  selector:
+    app: es
+  ports:
+    - name: es-port 
+      port: 9200
+  type: ClusterIP    

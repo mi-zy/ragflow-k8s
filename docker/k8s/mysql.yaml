@@ -1,0 +1,109 @@
+# RagFlow使用MySQL存储：用户信息、系统配置信息、任务定义、执行状态、结果等，10G足够。
+# run-nok:（PersistentVolumeClaim，Service,ConfigMap仅运行1次，所以注释）
+ # mountPath: /var/lib/mysql 这儿运行有问题？  加上subPath: mysql正常，原因未明。
+
+  
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragflow-mysql
+  namespace: ragflow
+  labels:
+    container_name: ragflow-mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: core.harbor.domain/mizy/mysql:5.7.18
+#--->command没有指定，指定args，Dockerfile配置的ENTRYPOINT的命令行会被执行，CMD会被args中填写的参数覆盖, 追加到 ENTRYPOINT 中  
+        args: 
+        - "--max_connections=1000"
+        - "--character-set-server=utf8mb4"        
+        - "--collation-server=utf8mb4_general_ci"        
+        - "--default-authentication-plugin=mysql_native_password"
+        - "--tls_version=`TLSv1.2,TLSv1.3`"
+        - "--init-file=/data/application/init.sql"          
+        # command: ["sleep", "3600"]
+        imagePullPolicy: IfNotPresent
+        securityContext:   
+          privileged: true                   
+        resources:
+          requests:
+            cpu: "2000m" 
+            memory: "4Gi"
+          limits:
+            cpu: "6000m"
+            memory: "6Gi"   
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "infini_rag_flow"
+        - name: TZ
+          value: "Asia/Shanghai"                         
+        ports:
+        - name: mysql-port 
+          containerPort: 3306     
+        volumeMounts:
+        - name: ragflow-mysql
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: volume-init-sql
+          mountPath: /data/application/           
+      volumes:
+        - name: ragflow-mysql
+          persistentVolumeClaim:
+            claimName: rook-ragflow-mysql     
+        - name: volume-init-sql
+          configMap:
+            name: cm-init-sql
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: mysql
+  name: rook-ragflow-mysql
+  namespace: ragflow  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: rook-ceph-block
+  volumeMode: Filesystem
+---
+ 
+# kubectl create configmap init-sql --from-file=/home/ragflow/ragflow/docker/init.sql
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+  # name: cm-init-sql 
+  # namespace: ragflow
+# data:
+  # init.sql: |
+    # CREATE DATABASE IF NOT EXISTS rag_flow;
+    # USE rag_flow;
+
+  
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: ragflow  
+spec:
+  selector:
+    app: mysql
+  ports: 
+    - name: mysql-port
+      port: 3306
+  type: ClusterIP        
