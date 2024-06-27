@@ -1,0 +1,28 @@
+apiVersion: apps/v1  
+kind: Deployment
+metadata:
+  name: ragflow-tool
+  labels:
+    app: debug-tools
+  namespace: ragflow 
+spec:
+  selector:
+    matchLabels:
+      app: debug-tools
+  template:
+    metadata:
+      labels:
+        app: debug-tools
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/dotbalo/debug-tools:latest
+        name: debug-tools
+        imagePullPolicy: IfNotPresent
+        command:
+        - sleep
+        - infinity
+      nodeSelector:
+        kubernetes.io/hostname: k8s-node07
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        effect: "NoSchedule"

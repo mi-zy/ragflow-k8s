@@ -1,0 +1,89 @@
+# RagFlow仅仅是将文件上传(是知识库上传；文件管理上传使用ES，然后链接到知识库)至MinIO，文件的解析需要手工点击触发，根据文件创建一个或多个异步任务，通过 Redis消息队列进行暂存，方便异步执行。
+# run-ok:（PersistentVolumeClaim，Service仅运行1次，所以注释）High Performance Object Storage
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragflow-minio
+  namespace: ragflow
+  labels:
+    controller: minio-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: core.harbor.domain/mizy/minio:RELEASE.2023-12-20T01-00-02Z
+        imagePullPolicy: IfNotPresent
+        securityContext:   
+          privileged: true                   
+        resources:
+          requests:
+            cpu: "4000m" 
+            memory: "4Gi"
+          limits:
+            cpu: "8000m"
+            memory: "6Gi"    
+        env:
+        - name: MINIO_ROOT_USER
+          value: "rag_flow"
+        - name: MINIO_ROOT_PASSWORD
+          value: "infini_rag_flow"    
+        - name: TZ
+          value: "Asia/Shanghai"    
+        command: ["/bin/sh","-c","--"]
+        args: ["minio server --console-address ':9001' /data"]             
+        ports:
+        - name: minio-server 
+          containerPort: 9000
+        - name: minio-console
+          containerPort: 9001      
+        volumeMounts:
+        - name: ragflow-minio
+          mountPath: /data
+      volumes:
+        - name: ragflow-minio
+          persistentVolumeClaim:
+            claimName: "rook-ragflow-minio"
+            
+---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+  # labels:
+    # app: minio
+  # name: rook-ragflow-minio
+  # namespace: ragflow  
+# spec:
+  # accessModes:
+  # - ReadWriteOnce
+  # resources:
+    # requests:
+      # storage: 20Gi
+  # storageClassName: rook-ceph-block
+  # volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: ragflow  
+spec:
+  selector:
+    app: minio
+  ports:
+    - name: minio-server 
+      port: 9000
+    - name: minio-console
+      port: 9001   
+  type: ClusterIP    
+
+ 

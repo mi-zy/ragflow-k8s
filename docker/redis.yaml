@@ -1,0 +1,86 @@
+# redis存储空间小点10G;使用redis加快数据访问速度，建议使用内存空间6Gi
+# run-ok:（PersistentVolumeClaim，Service仅运行1次，所以注释）
+ # k get pvc -n ragflow
+ # k -n ragflow get deploy,pod,svc -owide
+ # k -n ragflow describe pod ragflow-redis-6b4f5f9b99-9srg5
+ #  --->使用镜像中工具redis-cli测试？
+ 
+ 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ragflow-redis
+  namespace: ragflow
+  labels:
+    controller: redis-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: core.harbor.domain/mizy/redis:7.2.4
+        imagePullPolicy: IfNotPresent
+        securityContext:   
+          privileged: true                   
+        resources:
+          requests:
+            cpu: "7000m" 
+            memory: "16Gi"
+          limits:
+            cpu: "10000m"
+            memory: "18Gi"     
+        workingDir: /usr/local/bin/                
+        command: ["/bin/sh","-c","--"]
+        args: ["./redis-server --requirepass 'infini_rag_flow' --maxmemory 128mb --maxmemory-policy allkeys-lru "]   
+        ports:
+        - name: redis-port      
+          containerPort: 6379
+        volumeMounts:
+        # - name: ragflow-redis
+        - name: ragflow-redis-cache        
+          mountPath: /data
+      volumes:
+        - name: ragflow-redis
+          persistentVolumeClaim:
+            claimName: "rook-ragflow-redis"
+        - name: ragflow-redis-cache
+          emptyDir: 
+            medium: Memory      
+            sizeLimit: 6Gi        
+---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+  # labels:
+    # app: redis
+  # name: rook-ragflow-redis
+  # namespace: ragflow  
+# spec:
+  # accessModes:
+  # - ReadWriteOnce
+  # resources:
+    # requests:
+      # storage: 30Gi
+  # storageClassName: rook-ceph-block
+  # volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: ragflow  
+spec:
+  selector:
+    app: redis
+  ports:
+  - name: redis-port  
+    port: 6379
+  type: ClusterIP    
