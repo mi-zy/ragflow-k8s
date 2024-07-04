@@ -1,0 +1,88 @@
+# 配置 Istio 以通过专用的 Egress 网关服务间接调用外部服务
+# https://preliminary.istio.io/latest/zh/docs/tasks/traffic-management/egress/egress-gateway/
+
+# 为 egress.ollama.ai 定义 ServiceEntry，不配置VirtualService时 ,通过 Sidecar 直接调用的外部服务
+#  curl -sSL -o /dev/null -D - http://egress.ollama.ai:11434  --->ok
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: egress-ollama-serviceentry
+  namespace: ragflow 
+spec:
+  hosts:
+  - egress.ollama.ai
+  ports:
+  - number: 11434
+    name: http-port
+    protocol: HTTP
+  location: MESH_EXTERNAL  
+  resolution: STATIC
+  endpoints:
+  - address: 192.168.31.1 
+  
+---
+# 配置 Istio 以通过专用的 Egress 网关服务间接调用外部服务；为 egress.ollama.ai 端口 80 的出口流量创建一个 Gateway。    
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: istio-egressgateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: egressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - egress.ollama.ai
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: egressgateway-for-ollama
+  namespace: ragflow     
+spec:
+  host: istio-egressgateway.istio-system.svc.cluster.local
+  subsets:
+  - name: egress-ollama-serviceentry
+   
+---  
+#  将流量从边车导向到 Egress 网关，再从 Egress 网关导向到外部服务；curl -sSL -o /dev/null -D - http://egress.ollama.ai:80  --->ok
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: direct-ollama-through-egress-gateway
+  namespace: ragflow    
+spec:
+  hosts:
+  - egress.ollama.ai
+  gateways:
+  - istio-system/istio-egressgateway
+  - mesh
+  http:
+  - match:
+    - gateways:
+      - mesh
+      port: 80
+    route:
+    - destination:
+        host: istio-egressgateway.istio-system.svc.cluster.local
+        subset: egress-ollama-serviceentry
+        port:
+          number: 80
+      weight: 100
+  - match:
+    - gateways:
+      - istio-system/istio-egressgateway
+      port: 80
+    route:
+    - destination:
+        host: egress.ollama.ai
+        port:
+          number: 11434
+      weight: 100
+
+  

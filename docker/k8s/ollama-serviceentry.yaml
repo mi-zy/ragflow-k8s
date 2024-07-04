@@ -1,0 +1,22 @@
+# 使用 Service Entry 将一个可访问的外部服务注册到网格中。
+# curl -sSL -o /dev/null -D - http://ollama.ai:11434    --->ok
+# https://preliminary.istio.io/latest/zh/docs/tasks/traffic-management/egress/egress-gateway/
+
+# 通过 Sidecar 直接调用的外部服务（配置 Istio 以通过专用的Egress网关服务间接调用外部服务见ragflow2egress.yaml）
+
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: external-ollama-serviceentry
+  namespace: ragflow 
+spec:
+  hosts:
+  - ollama.ai
+  ports:
+  - number: 11434
+    name: http
+    protocol: HTTP
+  location: MESH_EXTERNAL  
+  resolution: STATIC
+  endpoints:
+  - address: 192.168.31.1

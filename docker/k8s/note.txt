@@ -1,11 +1,55 @@
-工作计划：
+工作计划：   ragflow登录：mizy@sina.com/jszcs7287886
 
-1、计划上传到Gitee（或阿里云效 Codeup，腾讯Coding），选择一下？
+1、上传到阿里云效
 2、RagFlow仅仅是将文件上传(是知识库上传；文件管理上传使用ES[100Gi]，然后链接到知识库)至MinIO[20Gi]，文件的解析需要手工点击触发，根据文件创建一个或多个异步任务，通过 Redis消息队列进行暂存，方便异步执行。
 3、RagFlow使用Elasticsearch存储上传文档数据（是文件管理上传后链接到知识库；知识库上传使用MinIO）、向量数据、任务信息
 4、RagFlow使用MySQL存储：用户信息、系统配置信息、任务定义、执行状态、结果等，建议10G。
 5、MySQL和redis存储空间建议10G;使用redis加快数据访问速度，建议存储使用内存空间
+6、istio异常：istiod和jaeger未启动，原因是新版本下载不下来，“临时”改成旧版本运行正常。
+docker pull  docker.io/istio/pilot:1.20.1  改成pilot:1.20.0
+docker save -o pilot1.20.1.tar docker.io/istio/pilot:1.20.1 
+ctr -n=k8s.io images  import pilot1.20.1.tar
+docker pull  docker.io/jaegertracing/all-in-one:1.46    改成all-in-one:1.35
+docker save -o all-in-one1.46.tar docker.io/jaegertracing/all-in-one:1.46 
+ctr -n=k8s.io images  import all-in-one1.46.tar
+ctr -n=k8s.io images ls |grep all-in-one
+ctr -n=k8s.io images export all-in-one.tar docker.io/jaegertracing/all-in-one:1.35
+ctr -n=k8s.io images  import  all-in-one.tar
+
+7、下一步ragflow加入服务网格，查看链路，确定运行慢的原因！
+ istio-injection=enabled ：   bookinfo   sample     vm-airnet 
+
+8、宿主机之间拷贝镜像
+ ctr -n k8s.io i ls |grep goharbor/harbor-db:v2.6.1
+  ctr -n k8s.io i tag docker.io/goharbor/harbor-core:v2.6.1  core.harbor.domain/mizy/harbor-core:v2.6.1
+ ctr -n k8s.io i export harbor-core-v2.6.1.tar core.harbor.domain/mizy/harbor-core:v2.6.1
+ ctr -n k8s.io i del core.harbor.domain/mizy/harbor-db:v2.6.1 
+ scp harbor-core-v2.6.1.tar 192.168.31.211:/home/
+  docker load < harbor-core-v2.6.1.tar
+  docker push  core.harbor.domain/mizy/harbor-core:v2.6.1
+k -n harbor edit sts atc-harbor-database
+          image: core.harbor.domain/mizy/harbor-db:v2.6.1
+ 
+ docker.io/goharbor/chartmuseum-photon:v2.6.1
+ ctr -n k8s.io i export chartmuseum-photon.tar docker.io/goharbor/chartmuseum-photon:v2.6.1
+  scp chartmuseum-photon.tar 192.168.31.220:/home/
+ ctr -n k8s.io i import chartmuseum-photon.tar
+
+9、atc-harbor-notary-signer:7899：certificate has expired
+2024/07/01 00:53:18 Failed to dial atc-harbor-notary-signer:7899: connection error: desc = "transport: x509: certificate has expired or is not yet valid: current time 2024-07-01T00:53:18Z is after 2023-10-23T13:20:20Z"; please retry. 
+由于 x509 证书已过期或尚未生效导致的连接问题。参考 Harbor的文档来了解如何重新生成或更新证书。helm 2 安装命令并加上`--dry-run --debug`选项，
+# helm install my-get-notary . --dry-run --debug
+
+10、使用istio的出口入口网关
+
+ 
 
 
 
 
+
+
+
+
+			
+			

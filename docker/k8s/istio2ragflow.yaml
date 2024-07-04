@@ -1,0 +1,57 @@
+# 访问域名被拒绝：book.atc.com 拒绝了我们的连接请求。不是“无法访问此网站”——>需加istio-ingressgateway服务的端口号。
+
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingressgateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway 
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "book.atc.com" 
+
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: ragflow-vs
+  namespace: ragflow   
+spec:
+  hosts:
+  - "book.atc.com"
+  gateways:
+  - istio-system/ingressgateway
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: ragflow.ragflow.svc.cluster.local
+        port:
+          number: 80
+          
+---
+# apiVersion: networking.istio.io/v1alpha3
+# kind: DestinationRule
+# metadata:
+  # name: ragflow-dr
+  # namespace: ragflow     
+# spec:
+  # host: ragflow.ragflow.svc.cluster.local
+  # subsets:
+  # - name: v1
+    # labels:
+      # version: v1
+  # - name: v2
+    # labels:
+      # version: v2
+
+          

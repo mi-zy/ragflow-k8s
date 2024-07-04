@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-test
+  namespace: study
+spec:
+  ingressClassName: nginx
+  rules: 
+  - host: ingress.test.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: nginx
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+  - host: ragflow.atc.com
+    http:
+      paths:
+      - backend:
+          service:
+            # name: tornado-ext
+            name: ragflow-ext         
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific 
+        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ragflow-ext
+  namespace: study
+spec:
+  externalName: ragflow.ragflow.svc.cluster.local
+  sessionAffinity: None
+  type: ExternalName    
