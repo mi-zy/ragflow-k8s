@@ -1,0 +1,23 @@
+# 创建 Kubernetes 网络策略来阻止绕过 Egress 网关的出站流量。创建一个 NetworkPolicy，限制ragflow  命名空间的出站流量， 只允许目标为控制平面、网关和 kube-system DNS 服务（端口 53）的所有请求。
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-istio-system-and-kube-dns
+  namespace: ragflow   
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kube-system: "true"
+    ports:
+    - protocol: UDP
+      port: 53
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          istio: system
